@@ -1,0 +1,16 @@
+.env*
+node_modules/
+.next/
+dist/
+storage/
+data/
+backups/
+*.tsbuildinfo
+
+build/
+.settings-*.tmp
+
+# Private handover notes and macOS files
+*-logins.txt
+sample-accounts-*.txt
+.DS_Store

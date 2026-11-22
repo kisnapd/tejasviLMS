@@ -1,0 +1,28 @@
+/* Confirm dialogs, toasts and the Ctrl/⌘+K command palette. Uses the shared --brand-* tokens. */
+
+.tj-confirm{font-family:Manrope,var(--font-sans),system-ui,sans-serif;border-radius:16px;border-color:var(--brand-line);box-shadow:0 24px 60px -20px color-mix(in srgb,var(--brand-primary) 45%,transparent)}
+.tj-confirm [data-slot=alert-dialog-title]{color:var(--brand-ink);font-size:1.05rem;line-height:1.35}
+.tj-confirm [data-slot=alert-dialog-description]{color:var(--brand-muted);line-height:1.5}
+.tj-confirm-media{border-radius:999px!important;width:3rem!important;height:3rem!important;background:var(--brand-soft)!important;color:var(--brand-primary)}
+.tj-confirm-media svg{width:1.5rem!important;height:1.5rem!important}
+.tj-confirm-media.danger{background:color-mix(in srgb,var(--destructive) 10%,white)!important;color:var(--destructive)}
+.tj-confirm [data-slot=alert-dialog-footer] button{border-radius:10px;font-weight:600}
+
+.tj-toast{font-family:Manrope,var(--font-sans),system-ui,sans-serif!important;border-radius:12px!important;border:1px solid var(--brand-line)!important;color:var(--brand-ink)!important;box-shadow:0 12px 32px -12px color-mix(in srgb,var(--brand-primary) 35%,transparent)!important}
+.tj-toast[data-type=success] [data-icon]{color:#15803d}
+.tj-toast[data-type=error] [data-icon]{color:var(--destructive)}
+.tj-toast[data-type=info] [data-icon]{color:var(--brand-primary)}
+
+.tj-palette{font-family:Manrope,var(--font-sans),system-ui,sans-serif;border-radius:16px!important;border-color:var(--brand-line)!important;max-width:min(560px,calc(100% - 2rem))!important}
+.tj-palette [cmdk-group-heading]{color:var(--brand-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+.tj-palette [cmdk-item]{border-radius:10px;color:var(--brand-ink);gap:.75rem}
+.tj-palette [cmdk-item][data-selected=true]{background:var(--brand-soft);color:var(--brand-primary)}
+.tj-palette [cmdk-item][data-current=true]::after{content:"Current";margin-left:auto;font-size:.7rem;color:var(--brand-muted)}
+.tj-palette-foot{display:flex;gap:1rem;justify-content:flex-end;padding:.55rem .9rem;border-top:1px solid var(--brand-line);font-size:.72rem;color:var(--brand-muted)}
+.tj-palette-foot kbd,.tj-nav-search kbd.tj-k{font:600 .68rem/1 ui-monospace,SFMono-Regular,Consolas,monospace;border:1px solid var(--brand-line-strong);border-radius:5px;padding:.15rem .3rem;background:white}
+.tj-palette-hint{border:0;background:none;padding:0;cursor:pointer;display:inline-flex}
+.tj-confirm [data-slot=alert-dialog-footer] [data-variant=destructive]{background:var(--destructive);color:#fff;border:0}
+.tj-confirm [data-slot=alert-dialog-footer] [data-variant=destructive]:hover{background:color-mix(in srgb,var(--destructive) 88%,black)}
+.tj-confirm [data-slot=alert-dialog-footer] [data-variant=default]{background:var(--brand-primary);color:var(--brand-on-primary);border:0}
+.tj-confirm [data-slot=alert-dialog-footer] [data-variant=default]:hover{background:var(--brand-primary-hover)}
+.tj-confirm [data-slot=alert-dialog-footer] [data-variant=outline]{border-color:var(--brand-line-strong)}
