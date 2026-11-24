@@ -2,7 +2,7 @@ import {directorySummary,supportedCampus} from '@/lib/shared-student-directory';
 import {createCampus,syncMember} from '@/lib/campus-data.mjs';
 import {referenceUrl} from '@/lib/college-policy';
 import {teacherResultClause} from '@/lib/course-policy';
-import {collegeSubject,linkCollegeSubject} from '@/lib/college-subject-access';
+import {curriculumKind,curriculumSubject,linkCurriculumSubject} from '@/lib/curriculum-subject';
 import {loginDestination} from '@/lib/login-destination';
 import {learningCategoryError} from '@/lib/learning-category';
 import { learnerClause,teacherClause,coursePermission } from '@/lib/course-access';
@@ -79,11 +79,11 @@ export async function POST(request:Request){try{
   if(member.kind==='edtech'&&(data.accessMode!=='assigned'||data.subjectId))throw new AppError('Provider programs use batch enrolment without academic subjects.');
   const categoryError=learningCategoryError(member.kind,data.learningType,data.subjectId);if(categoryError)throw new AppError(categoryError);
   if(data.subjectId&&!await one('SELECT id FROM subjects WHERE id=? AND org_id=?',[data.subjectId,orgId]))throw new AppError('Choose a subject in your organization.');if(data.id)await coursePermission(data.id,user.userId,true);
-  const collegeCurriculum=member.kind==='college'?await collegeSubject(orgId,user.userId,member.role,data.subjectId,data.id):null;if(collegeCurriculum&&data.accessMode!=='assigned')throw new AppError('College subjects use assigned semester enrolments.');
+  const curriculum=curriculumKind(member.kind)&&data.subjectId?await curriculumSubject(orgId,user.userId,member.role,data.subjectId,data.id):null;if(curriculum&&data.accessMode!=='assigned')throw new AppError('Subject content follows class or semester enrolment.');
   const courseId=data.id||randomUUID();await transaction(async c=>{
    if(data.quizId){const q=await one('SELECT author_id FROM quizzes WHERE id=? AND org_id=?',[data.quizId,orgId],c);if(!q)throw new AppError('Choose a quiz from your workspace.');if(member.role!=='admin'&&q.author_id!==user.userId&&!await one(`SELECT c.id FROM courses c WHERE c.org_id=? AND c.quiz_id=? AND ${teacherClause()}`,[orgId,data.quizId,user.userId,user.userId],c))throw new AppError('Choose a quiz from your workspace.')}
    if(data.id){const prior=await courseAccess(courseId,orgId,c,true);await run('UPDATE courses SET title=?,description=?,audience=?,status=?,quiz_id=?,access_mode=?,subject_id=?,updated_at=UTC_TIMESTAMP(3) WHERE id=?',[data.title,data.description,data.audience,data.status,data.quizId||null,data.accessMode,data.subjectId||null,courseId],c)}else await run('INSERT INTO courses(id,org_id,author_id,title,description,audience,status,quiz_id,access_mode,subject_id) VALUES(?,?,?,?,?,?,?,?,?,?)',[courseId,orgId,user.userId,data.title,data.description,data.audience,data.status,data.quizId||null,data.accessMode,data.subjectId||null],c);
-   if(collegeCurriculum&&!data.id)await linkCollegeSubject(courseId,orgId,user.userId,member.role,collegeCurriculum as {id:string;college_semester_id?:string|null},c);
+   if(curriculum&&!data.id)await linkCurriculumSubject(courseId,orgId,user.userId,member.role,curriculum as {id:string;college_semester_id?:string|null},c);
    const current=await rows('SELECT id FROM lessons WHERE course_id=?',[courseId],c),ids=new Set(current.map(l=>l.id));
    for(const [position,l] of data.lessons.entries()){if(ids.has(l.id))await run('UPDATE lessons SET title=?,content=?,video_url=?,position=?,format=?,duration_minutes=? WHERE id=? AND course_id=?',[l.title,l.content,l.videoUrl,position,l.format,l.duration,l.id,courseId],c);else await run('INSERT INTO lessons(id,course_id,title,content,video_url,position,format,duration_minutes) VALUES(?,?,?,?,?,?,?,?)',[l.id,courseId,l.title,l.content,l.videoUrl,position,l.format,l.duration],c)}
    for(const l of current)if(!data.lessons.some(x=>x.id===l.id))await run('DELETE FROM lessons WHERE id=? AND course_id=?',[l.id,courseId],c);

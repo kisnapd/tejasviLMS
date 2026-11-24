@@ -18,3 +18,15 @@
 .ax-chart g[role=button]{cursor:pointer}.ax-chart g[role=button]:focus-visible{outline:2px solid #42678c;outline-offset:2px}
 
 .ax-private-lookup{margin:0 clamp(1rem,2vw,1.8rem) 1.2rem;border:1px solid #d8c5ae;background:#fff8ef;border-radius:9px;padding:.7rem}.ax-private-lookup b{color:#765336;font-size:.79rem}.ax-private-lookup>div{display:flex;gap:.35rem;flex-wrap:wrap;margin:.3rem 0}.ax-private-lookup button{font:600 .75rem Manrope,system-ui;padding:.35rem .48rem;border:1px solid #d9cbbb;border-radius:6px;color:#334e62;background:#fff;cursor:pointer}.ax-private-lookup p{font-size:.83rem;color:#3e596b;margin:.4rem 0 0}
+
+/* Subjects by grade */
+.subject-group{margin:1.6rem 0}.subject-group>h2{font-size:1.05rem;letter-spacing:-.01em;margin:0 0 .6rem;color:var(--brand-ink,#063868)}
+.subject-list{display:grid;gap:.6rem}
+.subject-row{background:#fff;border:1px solid #dde6ef;border-radius:14px;padding:.9rem 1rem}
+.subject-row-head{display:flex;gap:1rem;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.subject-row h3{margin:0;font-size:1rem}.subject-row h3 small{font-weight:500;color:#5b6f85}
+.subject-row .muted{display:flex;align-items:center;gap:.35rem;margin:.25rem 0 0;font-size:.85rem;color:#5b6f85}
+.subject-row .button{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap}
+.subject-content{list-style:none;margin:.7rem 0 0;padding:.6rem 0 0;border-top:1px solid #edf2f7;display:grid;gap:.35rem}
+.subject-content li{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}.subject-content .quiet-link{display:inline-flex;align-items:center;gap:.35rem;font-weight:650}
+.subject-content small{color:#6b7d90}.badge.badge-muted{background:#eef2f6;color:#5b6f85}

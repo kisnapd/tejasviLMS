@@ -1,4 +1,5 @@
 import {profile as readProfile,saveProfile,recordChanged,json as recordJson} from '../../../lib/campus-data.mjs';
+import {syncLearning} from '../../../lib/learning-sync.mjs';
 import { MySQLDatabase } from './database.mjs';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -151,5 +152,6 @@ export class Store {
             throw new Error('A login account is linked to this record. Update the account first.');
         (await this.db.prepare('UPDATE emis_records SET archived=1,version=version+1,updated_at=? WHERE org_id=:org AND id=?').run(new Date().toISOString(), id));
         (await this.log(user, 'archived', entity, id, r, null));
+        await syncLearning(this.db.connection(), this.org);
     }
 }

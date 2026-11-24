@@ -7,12 +7,15 @@ import mysql from 'mysql2/promise';
 import {root} from './common.mjs';
 import {credentials,actor} from '../modules/emis/server/context.mjs';
 import {createEmis} from '../modules/emis/server/index.mjs';
+import {syncLearning} from '../lib/learning-sync.mjs';
 // Starts the Tejasvi web server for a verified configuration.
 // scripts/server.mjs passes the launcher's own database; tests/qa passes the isolated QA database.
 export async function startServer(config,{emisDir=resolve(root,'storage/emis')}={}){
 process.env.NODE_ENV='production';const site=new URL(config.origin);const port=Number(site.port||80),host='127.0.0.1';
 const app=next({dev:false,dir:root,hostname:host,port});await app.prepare();const handle=app.getRequestHandler();
 const pool=mysql.createPool({...config.db,connectionLimit:10,waitForConnections:true,queueLimit:100,charset:'utf8mb4',timezone:'Z',dateStrings:true,jsonStrings:true,multipleStatements:false});
+// Bring Learning in step with EMIS once at start (for example after an update); later changes sync as they are saved.
+for(const {id} of (await pool.query("SELECT id FROM organizations WHERE kind IN ('school','college')"))[0]){const c=await pool.getConnection();try{await c.beginTransaction();await syncLearning(c,id);await c.commit();}catch(e){await c.rollback();console.error('Learning sync skipped for one institution:',e.message);}finally{c.release();}}
 const dist=realpathSync(resolve(root,'build/emis')),sec={'Cache-Control':'private, no-store','X-Frame-Options':'DENY','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'};
 function deny(res,status,msg,asJson){res.writeHead(status,{...sec,'Content-Type':asJson?'application/json; charset=utf-8':'text/html; charset=utf-8'});res.end(asJson?JSON.stringify({error:msg}):'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Workspace access · Tejasvi</title><main style="font:18px/1.55 system-ui;color:#12395c;max-width:36em;margin:12vh auto;padding:1rem"><h1>Workspace access</h1><p>This EMIS workspace is available to authorized members of its school or college.</p><p><a href="/workspaces">Go to my workspaces</a></p></main></html>');}
 const types={'.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.html':'text/html; charset=utf-8','.ttf':'font/ttf','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp'};

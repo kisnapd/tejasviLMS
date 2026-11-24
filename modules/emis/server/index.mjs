@@ -1,6 +1,6 @@
 import { schoolRoute } from './school.mjs';
 import { esewaReturn, esewaConfig } from './school-family.mjs';
-import {learningOverview,publishSubject} from './learning.mjs';
+import {learningOverview} from './learning.mjs';
 import {MySQLDatabase} from './database.mjs';
 import {many,one} from '../../../lib/campus-data.mjs';
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
@@ -68,8 +68,7 @@ export function createEmis({pool,org,auth,user,dataDir}) {
             if(path.startsWith('/api/')){
                 if(method!=='GET' && (req.headers.origin!==process.env.APP_URL||req.headers['x-csrf-token']!==user.csrf))throw fail('Refresh the workspace and try again.',403);
                 const currentProfile=await store.meta('profile');if(!currentProfile)throw fail('This organization has no EMIS workspace.',403);
-                if(path==='/api/learning/overview'&&method==='GET')return json(res,await learningOverview(store,user,url.searchParams.get('year')||currentProfile.year));
-                if(path==='/api/learning/subjects'&&method==='POST')return json(res,await publishSubject(store,user,(await body(req,1000)).recordId));
+                if(path==='/api/learning/overview'&&method==='GET')return json(res,await learningOverview(store,user));
                 if (path === '/api/bootstrap' && method === 'GET') {
                     const all = (await store.all()), records = {};
                     for (const entity of Object.keys(modules)) {
