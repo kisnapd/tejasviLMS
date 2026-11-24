@@ -28,11 +28,20 @@ export const canManageUsers = role => ['Super Admin', 'Admin'].includes(normaliz
 export const canManageInstitution = role => canManageUsers(role) || role === 'EMIS Coordinator';
 export const canViewInstitution = role => canManageInstitution(role) || ['Principal', 'Campus Chief', 'IQAC Head'].includes(role);
 /** Roles that exist only in one kind of workspace. */
-export const SCHOOL_ONLY_ROLES = ['Principal'];
-export const roleAvailable = (role, kind) => !SCHOOL_ONLY_ROLES.includes(normalizeRole(role)) || kind === 'school';
+export const SCHOOL_ONLY_ROLES = ['Principal', 'Parent'];
+export const COLLEGE_ONLY_ROLES = ['Campus Chief', 'IQAC Head', 'Program Director', 'Research Head', 'Alumni Coordinator'];
+export const roleAvailable = (role, kind) => { const r = normalizeRole(role); return (!SCHOOL_ONLY_ROLES.includes(r) || kind === 'school') && (!COLLEGE_ONLY_ROLES.includes(r) || kind !== 'school'); };
+/** What people at this kind of institution call a role. Stored values do not change. */
+export const roleLabel = (role, kind) => kind === 'school' && normalizeRole(role) === 'Faculty' ? 'Teacher' : normalizeRole(role);
+/** Role description in the institution's own words. */
+export const describeRole = (role, kind) => { const d = roleDescriptions[normalizeRole(role)] || ''; return kind === 'school' ? d.replace(/^School only: /, '').replace(/\bcollege\b/g, 'school').replace(/\bFaculty\b/g, 'Teachers').replace(/Assigned courses/g, 'Assigned classes and subjects') : d; };
+/** The word for the institution: 'school' or 'college'. */
+export const placeWord = kind => kind === 'school' ? 'school' : 'college';
+/** A readable temporary password (letters and digits without 0/O/1/I/l), e.g. Tj-K7MP-Q3XA-9RWD. */
+export function temporaryPassword() { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = new Uint8Array(12); globalThis.crypto.getRandomValues(b); let s = ''; for (const x of b) s += a[x % 32]; return 'Tj-' + s.match(/.{4}/g).join('-'); }
 export const rolesForKind = (roles, kind) => roles.filter(r => roleAvailable(r, kind));
 export const assignableRoles = role => isSuperAdmin(role) ? [...ROLES] : normalizeRole(role) === 'Admin' ? ROLES.filter(r => !['Super Admin', 'Admin'].includes(r)) : [];
 export const canManageRole = (actorRole, targetRole) => assignableRoles(actorRole).includes(normalizeRole(targetRole));
 export const roleLevel = role => isSuperAdmin(role) ? 1 : role === 'Admin' ? 2 : role === 'Faculty' ? 4 : role === 'Student' || role === 'Parent' ? 5 : 3;
-export const roleScope = role => role === 'Parent' ? 'Their own children only' : role === 'Student' ? 'Own records only' : role === 'Faculty' ? 'Assigned courses and their students' : role === 'Program Director' ? 'Assigned program only' : 'Permitted college modules';
-export const roleLink = role => ({ Student: ['studentId', 'students', 'Student profile'], Faculty: ['facultyId', 'faculty', 'Faculty profile'], 'Program Director': ['programId', 'programs', 'Assigned program'] })[normalizeRole(role)];
+export const roleScope = (role, kind) => role === 'Parent' ? 'Their own children only' : role === 'Student' ? 'Own records only' : role === 'Faculty' ? (kind === 'school' ? 'Assigned classes and their students' : 'Assigned courses and their students') : role === 'Program Director' ? 'Assigned program only' : 'Permitted ' + placeWord(kind) + ' modules';
+export const roleLink = (role, kind) => ({ Student: ['studentId', 'students', 'Student'], Faculty: ['facultyId', 'faculty', kind === 'school' ? 'Teacher' : 'Faculty profile'], 'Program Director': ['programId', 'programs', 'Assigned program'] })[normalizeRole(role)];

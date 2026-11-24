@@ -25,3 +25,7 @@
 .nav-result>span b{font-weight:700;color:var(--brand-ink,#0b2440);font-size:.84rem}
 .nav-result>span small{font-size:.72rem;color:var(--brand-muted,#566a7f)}
 .nav-result.active{background:var(--brand-soft,#eef3f8);box-shadow:inset 3px 0 var(--brand-accent,#ff7800)}
+.nav-item.nav-more{font-size:.8rem;color:#5b6f85;min-height:32px;justify-content:space-between;padding-right:14px}.nav-item.nav-more svg{transition:transform .15s}.nav-item.nav-more svg.rotated{transform:rotate(-90deg)}
+.password-generate{display:flex;gap:8px;align-items:stretch}.password-generate input{flex:1;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em}.password-generate .btn{white-space:nowrap}
+.signin-details code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.95em;background:#eef3f6;border-radius:5px;padding:2px 6px;white-space:nowrap}.signin-details .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 6px}
+.bulk-list{max-height:min(48vh,420px);overflow:auto;margin-top:8px}.bulk-list td small{display:block;color:#6b7d90}

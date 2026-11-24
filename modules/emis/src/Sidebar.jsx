@@ -33,7 +33,7 @@ const SCHOOL_MENU = [
     ['-', 'Set up'], ['salaryStructures', 'Salary structure', 'basic allowance ssf'],
     ['-', 'Records'], ['payslips', 'Payslips', 'salary slip'], ['development', 'Staff training', 'development workshop']]],
   ['communication', 'Messages & calendar', MessageSquare, [
-    ['school-messages', 'Messages', 'chat parent teacher conversation'], ['notices', 'Notices', 'announcement circular news'], ['school-calendar', 'School calendar', 'holiday event nepali bs date vacation'], ['school-sms', 'SMS messages', 'text sms log sent'],
+    ['school-messages', 'Messages', 'chat parent teacher conversation'], ['notices', 'Notices', 'announcement circular news'], ['school-calendar', 'School calendar', 'holiday event nepali bs date vacation'], ['school-sms', 'Send SMS', 'text sms log sent messages'],
     ['-', 'Records'], ['events', 'Calendar events', 'holiday'], ['messages', 'All messages', '']]],
   ['campus', 'Transport & library', Bus, [
     ['school-bus', 'Bus attendance', 'transport van boarded pickup drop'], ['routes', 'Bus routes', 'transport stop route fare'], ['vehicles', 'Vehicles', 'bus van driver'],
@@ -125,8 +125,19 @@ export default function Sidebar({ ctx, page, mobileOpen, closeMobile, compact, s
   // Keep only what this person can open; drop sub-headings with nothing under them.
   const visible = useMemo(() => menu.map(([id, title, Icon, items]) => {
     const out = []; let pending = null;
-    for (const it of items) { if (it[0] === '-') { pending = it[1]; continue; } if (!available(ctx, it[0]) || out.some((x) => x.key === it[0])) continue; if (pending) { out.push({ heading: pending }); pending = null; } out.push({ key: it[0], label: it[1], words: it[2] || '' }); }
-    return { id, title, Icon, items: out };
+    // Everyday work pages stay in view. Raw "Records" lists, and set-up registers this person
+    // cannot change, fold under "More" in the group; the menu search still finds all of them.
+    const more = []; let section = '';
+    for (const it of items) {
+      if (it[0] === '-') { section = it[1]; pending = it[1] === 'Records' ? null : it[1]; continue; }
+      if (!available(ctx, it[0]) || out.some((x) => x.key === it[0]) || more.some((x) => x.key === it[0])) continue;
+      const entry = { key: it[0], label: it[1], words: it[2] || '' };
+      if (section === 'Records' || (section === 'Set up' && !(modules[it[0]] && can(ctx.user.role, it[0], 'write')))) { more.push(entry); continue; }
+      if (pending) { out.push({ heading: pending }); pending = null; }
+      out.push(entry);
+    }
+    if (!out.some((x) => x.key) && more.length) return { id, title, Icon, items: more, more: [] };
+    return { id, title, Icon, items: out, more };
   }).filter((g) => g.items.some((x) => x.key)), [menu, ctx.user.role, ctx.profile.kind, ctx.allAccess]);
   const activeGroup = visible.find((g) => g.items.some((x) => x.key === page))?.id;
   const storeKey = 'emis-nav-v2:' + (family ? 'family' : ctx.profile.kind);
@@ -136,7 +147,8 @@ export default function Sidebar({ ctx, page, mobileOpen, closeMobile, compact, s
   const [query, setQuery] = useState(''), [cursor, setCursor] = useState(0);
   const extras = [['overview', family ? 'My dashboard' : 'Dashboard', 'home start'], ...(!family ? [['campus', ctx.profile.kind === 'school' ? 'School information' : 'College information', 'profile about campus']] : []), ['settings', manager ? 'Settings' : 'My account', 'password profile preferences sms fine discount'], ['help', family ? 'Help & support' : 'Help & documentation', 'guide how to manual'],
     ...((ctx.data?.suite && family) || (ctx.data?.learning && !family) ? [['@learning', 'Tejasvi Learning (LMS)', 'lms lesson course online class quiz']] : []), ...(ctx.data?.suite ? [['@workspaces', 'My workspaces', 'switch school college organization']] : [])];
-  const index = useMemo(() => [...visible.flatMap((g) => g.items.filter((x) => x.key).map((x) => ({ ...x, group: g.title, Icon: ICONS[x.key] || g.Icon }))), ...extras.map(([key, label, words]) => ({ key, label, words, group: 'General', Icon: key === 'overview' ? LayoutDashboard : key === 'settings' ? Settings : key === 'help' ? HelpCircle : key === '@learning' ? BookOpen : House }))], [visible, ctx.data]);
+  const [showMore, setShowMore] = useState([]);
+  const index = useMemo(() => [...visible.flatMap((g) => [...g.items, ...g.more].filter((x) => x.key).map((x) => ({ ...x, group: g.title, Icon: ICONS[x.key] || g.Icon }))), ...extras.map(([key, label, words]) => ({ key, label, words, group: 'General', Icon: key === 'overview' ? LayoutDashboard : key === 'settings' ? Settings : key === 'help' ? HelpCircle : key === '@learning' ? BookOpen : House }))], [visible, ctx.data]);
   const words = norm(query).split(/\s+/).filter(Boolean);
   const results = !words.length ? [] : index.map((x) => {
     const label = norm(x.label), hay = `${label} ${norm(x.words)} ${norm(x.group)} ${norm(x.key)}`;
@@ -166,9 +178,11 @@ export default function Sidebar({ ctx, page, mobileOpen, closeMobile, compact, s
       {item('overview', family ? 'My dashboard' : 'Dashboard', LayoutDashboard)}
       {family && ctx.data?.suite && <button className="nav-item student-learning-link" aria-label="My learning in Tejasvi" title={compact ? 'My learning in Tejasvi' : undefined} onClick={ctx.openLearning}><BookOpen size={20} /><span>My learning in Tejasvi</span></button>}
       {!family && visible.length > 1 && <div className="nav-group-actions"><button onClick={() => setOpen(visible.map((x) => x.id))}>Expand all</button><button onClick={() => setOpen([])}>Collapse all</button></div>}
-      {visible.map(({ id, title, Icon, items }) => { const expanded = open.includes(id), count = items.filter((x) => x.key).length; return <div className={'nav-group' + (activeGroup === id ? ' has-active' : '')} key={id}>
+      {visible.map(({ id, title, Icon, items, more }) => { const expanded = open.includes(id), count = items.filter((x) => x.key).length + more.length, moreOpen = showMore.includes(id) || more.some((x) => x.key === page); return <div className={'nav-group' + (activeGroup === id ? ' has-active' : '')} key={id}>
         <button className="group-toggle" title={compact ? title : undefined} aria-label={`${title}, ${count} items`} aria-expanded={(!compact || mobileOpen) && expanded} aria-controls={`navigation-${id}`} onClick={() => toggle(id)}><Icon size={20} /><span>{title}</span><ChevronDown size={16} className={expanded ? '' : 'rotated'} /></button>
-        <div id={`navigation-${id}`} className="nav-children" hidden={(compact && !mobileOpen) || !expanded}>{items.map((x, i) => x.heading ? <p key={'h' + i} className="nav-sub-label">{x.heading}</p> : item(x.key, x.label, family ? ICONS[x.key] : null))}</div></div>; })}
+        <div id={`navigation-${id}`} className="nav-children" hidden={(compact && !mobileOpen) || !expanded}>{items.map((x, i) => x.heading ? <p key={'h' + i} className="nav-sub-label">{x.heading}</p> : item(x.key, x.label, family ? ICONS[x.key] : null))}
+          {more.length > 0 && <button className="nav-item nav-more" aria-expanded={moreOpen} onClick={() => setShowMore((old) => (old.includes(id) ? old.filter((x) => x !== id) : [...old, id]))}><span>{moreOpen ? 'Fewer' : `More (${more.length})`}</span><ChevronDown size={14} className={moreOpen ? '' : 'rotated'} /></button>}
+          {moreOpen && more.map((x) => item(x.key, x.label, null))}</div></div>; })}
     </>}
       <div className="nav-insights">{ctx.data?.learning && !family && <button className="nav-item" onClick={ctx.openLearning} aria-label="Open Tejasvi Learning"><BookOpen size={20} /><span>Tejasvi Learning (LMS)</span></button>}{ctx.data?.suite && <a className="nav-item" href="/workspaces" title="My workspaces" aria-label="My workspaces"><House size={20} /><span>My workspaces</span></a>}{item('settings', manager ? 'Settings' : 'My account', Settings)}{!canManageUsers(role) && item('roles', 'My permissions', LockKeyhole)}{item('help', family ? 'Help & support' : 'Help & documentation', HelpCircle)}</div>
     </nav><div className="sidebar-bottom"><div className="user-block"><span className="avatar" aria-hidden="true">{ctx.user.name.split(' ').map(s => s[0]).slice(0, 2).join('')}</span><span><b>{ctx.user.name}</b><small>{role}</small></span><button className="icon-btn" aria-label="Sign out" title="Sign out" onClick={onLogout}><LogOut size={20} /></button></div></div>

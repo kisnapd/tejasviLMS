@@ -14,7 +14,7 @@ import { modules, ROLES, YEARS, can, scopeRecord, calculateIndicators } from '..
 import { validAcademicYear } from './progression.mjs';
 import { importRecords } from './imports.mjs';
 import { previewRollover, applyRollover, rolloverHistory } from './progression.mjs';
-import { listAccounts, createAccount, updateAccount, accountSummary, permissionCatalog } from './accounts.mjs';
+import { listAccounts, createAccount, bulkAccounts, updateAccount, accountSummary, permissionCatalog } from './accounts.mjs';
 import { previewStudentBulk, applyStudentBulk } from './student-bulk.mjs';
 import { isSuperAdmin, canManageInstitution, canViewInstitution } from '../shared/access.mjs';
 import { financeDocument } from './finance-documents.mjs';
@@ -212,6 +212,7 @@ export function createEmis({pool,org,auth,user,dataDir}) {
                 if (path === '/api/roles' && method === 'GET') return json(res, permissionCatalog(user, (await store.meta('profile'))?.kind));
                 if (path === '/api/users' && method === 'GET') return json(res, await listAccounts(store, user));
                 if (path === '/api/users' && method === 'POST') return json(res, await createAccount(store, user, await body(req, 20000)), 201);
+                if (path === '/api/users/bulk' && method === 'POST') return json(res, await bulkAccounts(store, user, await body(req, 40000)), 201);
                 const accountMatch = path.match(/^\/api\/users\/([a-zA-Z0-9-]+)$/);
                 if (accountMatch && method === 'PUT') return json(res, await updateAccount(store, user, accountMatch[1], await body(req, 20000)));
                 if (path === '/api/students/bulk/preview' && method === 'POST') return json(res, await previewStudentBulk(store, user, await body(req, 100000)));

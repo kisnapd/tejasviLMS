@@ -93,6 +93,23 @@ export function FamilyHome({ ctx, api }) {
   </div>;
 }
 
+/* ------------------------------------------------------------ First-time setup */
+/** The five things a new school needs, in order. Hidden once all are done or dismissed. */
+function SetupChecklist({ ctx }) {
+  const key = 'emis-setup-dismissed:' + (ctx.profile.name || ''), [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) === '1'; } catch { return false; } });
+  const n = (e) => ctx.rows(e).length, logins = (ctx.data?.accounts?.total ?? 0);
+  const steps = [
+    ['classes', 'Add classes and sections', 'Grade 1 A, Grade 1 B…', n('classes') > 0],
+    ['faculty', 'Add teachers', 'Name, subject and email for each teacher', n('faculty') > 0],
+    ['bulk-students', 'Add students', 'Type them in or import a spreadsheet', n('students') > 0],
+    ['users', 'Give people logins', 'Create logins for a whole class at once', logins > 1],
+    ['feeHeads', 'Set fees (optional)', 'Tuition, transport and other fee heads', n('feeHeads') > 0],
+  ], done = steps.filter((s) => s[3]).length;
+  if (hidden || done === steps.length) return null;
+  return <section className="sp-card sp-setup" aria-labelledby="setup-title"><div className="sp-card-head"><h2 id="setup-title"><CheckCheck size={18} /> Set up your school · {done} of {steps.length} done</h2><button className="sp-link" onClick={() => { try { localStorage.setItem(key, '1'); } catch {} setHidden(true); }}>Hide</button></div>
+    <ol className="sp-setup-steps">{steps.map(([page, title, hint, ok], i) => <li key={page} className={ok ? 'done' : ''}><span className="sp-setup-num">{ok ? <CheckCheck size={15} /> : i + 1}</span><div><b>{title}</b><small>{hint}</small></div>{!ok && <button className="sp-btn" onClick={() => ctx.go(page)}>Start <ArrowRight size={15} /></button>}</li>)}</ol></section>;
+}
+
 /* ------------------------------------------------------------ Staff school home */
 export function SchoolHome({ ctx }) {
   const role = ctx.user.role, classes = ctx.rows('classes'), students = ctx.rows('students').filter((s) => s.status === 'Active');
@@ -109,10 +126,11 @@ export function SchoolHome({ ctx }) {
       <p>{notTaken.length ? `${notTaken.length} class${notTaken.length === 1 ? ' has' : 'es have'} not taken attendance today.` : marked.length ? 'Attendance is taken for every class today.' : 'Here is your school at a glance.'}</p></div>
       {actions.length > 0 && <div className="sp-hero-actions">{actions.slice(0, 4).map(([k, label, Icon], i) => <button key={k} className={i ? 'sp-qa' : 'sp-qa primary'} onClick={() => ctx.go(k)}><Icon size={17} /> {label}</button>)}</div>}
     </section>
+    {canManageUsers(role) && <SetupChecklist ctx={ctx} />}
     <div className="sp-tiles">
       <Tile tone="blue" value={students.length} label={`Students · ${classes.length} classes`} onClick={can(role, 'students') ? () => ctx.go('students') : undefined} />
       <Tile tone="teal" value={marked.length ? Math.round((present / marked.length) * 100) + '%' : '—'} label="Present today" onClick={can(role, 'schoolAttendance', 'write') ? () => ctx.go('school-attendance') : undefined} />
-      <Tile tone="rose" value={can(role, 'fees') ? npr(owed) : '—'} label="Fees outstanding" onClick={can(role, 'fees') ? () => ctx.go('fees') : undefined} />
+      {can(role, 'fees') && <Tile tone="rose" value={npr(owed)} label="Fees outstanding" onClick={() => ctx.go('fees')} />}
       <Tile tone="purple" value={pendingLeave} label="Leave notes to review" onClick={can(role, 'leaveRequests') ? () => ctx.go('leaveRequests') : undefined} />
     </div>
     <div className="sp-two">

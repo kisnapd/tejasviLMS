@@ -8,7 +8,7 @@ import { one, run, transaction } from '@/lib/db';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { cookieName, digest, getUser, identity, issueSession, setSession, signOut, throttle } from '@/lib/auth';
 import { AppError, readJson, respond, failure } from '@/lib/errors';
-import { loginDestination } from '@/lib/login-destination';
+import { signInHome } from '@/lib/home';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const password=z.string().min(12).max(128);
@@ -35,7 +35,7 @@ export async function POST(request:Request,{params}:{params:Promise<{action:stri
   const member=data.orgId?await one('SELECT o.id,o.kind,m.role FROM memberships m JOIN organizations o ON o.id=m.org_id WHERE m.user_id=? AND o.id=?',[row.id,data.orgId]):await memberBrand(row.id);
   const ops=await one("SELECT m.org_id id FROM institution_memberships m JOIN organizations o ON o.id=m.org_id JOIN emis_roles r ON r.org_id=m.org_id AND r.user_id=m.user_id WHERE m.active=1 AND m.role='ops' AND o.kind IN('school','college') AND m.user_id=? AND (?='' OR m.org_id=?) ORDER BY o.name LIMIT 1",[row.id,data.orgId||'',data.orgId||'']);
   if(data.orgId&&!member&&!ops)throw new AppError('This account does not have access to this organization.',403);
-  const destination=member?'/workspaces':ops?'/erp/'+ops.id+'/':loginDestination(null,!!row.platform_admin);
+  const destination=data.orgId&&(member||ops)?'/enter/'+data.orgId:await signInHome(row.id,!!row.platform_admin);
   if(!destination)throw new AppError('Your account has no active workspace. Contact your administrator.',403);
   if(member)await selectBrand(member.id);else (await cookies()).delete(brandCookie);
   const old=(await cookies()).get(cookieName)?.value;if(old)await run('DELETE FROM sessions WHERE token_hash=?',[digest(old)]);
@@ -45,9 +45,11 @@ export async function POST(request:Request,{params}:{params:Promise<{action:stri
  if(action==='logout'){await signOut();return respond({redirect:'/login'})}
  if(action==='change-password'){
   const user=await identity(true),data=z.object({currentPassword:z.string().max(128),newPassword:password}).parse(body);await throttle('password:'+user.userId,10);
-  const account=await one('SELECT password_hash FROM users WHERE id=?',[user.userId]);if(!account||!await verifyPassword(data.currentPassword,account.password_hash))throw new AppError('Your current password is incorrect.',400);
-  if(data.currentPassword===data.newPassword)throw new AppError('Choose a different password.');
-  const hashed=await hashPassword(data.newPassword);const session=await transaction(async c=>{await run('UPDATE users SET password_hash=?,must_change_password=FALSE WHERE id=?',[hashed,user.userId],c);await run('DELETE FROM sessions WHERE user_id=?',[user.userId],c);return issueSession(user.userId,c)});await setSession(session);const brand=await memberBrand(user.userId);return respond({redirect:loginDestination(brand as {kind:string;role:string}|null,user.platformAdmin)||'/workspaces'});
+  const account=await one('SELECT password_hash,must_change_password FROM users WHERE id=?',[user.userId]),firstTime=!!account?.must_change_password;
+  // A temporary password was just used to sign in, so the forced first change does not ask for it again.
+  if(!account||(!firstTime||data.currentPassword)&&!await verifyPassword(data.currentPassword,account.password_hash))throw new AppError('Your current password is incorrect.',400);
+  if(await verifyPassword(data.newPassword,account.password_hash))throw new AppError('Choose a different password from your temporary one.');
+  const hashed=await hashPassword(data.newPassword);const session=await transaction(async c=>{await run('UPDATE users SET password_hash=?,must_change_password=FALSE WHERE id=?',[hashed,user.userId],c);await run('DELETE FROM sessions WHERE user_id=?',[user.userId],c);return issueSession(user.userId,c)});await setSession(session);return respond({redirect:await signInHome(user.userId,user.platformAdmin)||'/workspaces'});
  }
  throw new AppError('Not found.',404);
 }catch(e){return failure(e)}}
