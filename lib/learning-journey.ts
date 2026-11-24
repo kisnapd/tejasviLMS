@@ -3,6 +3,7 @@ import {rows,one,type DB} from './db';
 import {learnerClause,teacherClause,teacherResultClause} from './course-policy';
 import {utcMillis,submissionState} from './assessment-policy';
 import {AppError} from './errors';
+import {assertRegistered} from './platform-server';
 import type {GradeItem,JourneyRow,JourneyData} from './learning-journey-types';
 import {weightedGrade,DEFAULT_POLICY} from './quiz-engine.mjs';
 type R=Record<string,any>;
@@ -23,6 +24,7 @@ export function selectedResult(row:JourneyRow,keys:string[]){
 export async function learningJourney(org:string,uid:string,db:DB,courseId?:string):Promise<JourneyData>{
  const member=await one('SELECT o.kind,m.role FROM organizations o JOIN memberships m ON m.org_id=o.id WHERE o.id=? AND m.user_id=?',[org,uid],db);
  if(!member||!['admin','teacher','student','employee'].includes(member.role))throw new AppError('This learning workspace is not available to your account.',403);
+ await assertRegistered(org,uid,db);
  const learner=['student','employee'].includes(member.role),teacher=member.role==='teacher';
  const scope=learner?` AND c.status='published' AND ${learnerClause()}`:teacher?` AND ${teacherClause()}`:'';
  const courses=await rows(`SELECT c.id,c.title,c.status,c.subject_id AS subjectId,c.grading_policy AS gradingPolicy,c.quiz_id,q.title quizTitle,q.revision quizRevision,(SELECT COUNT(*) FROM quiz_questions qq WHERE qq.quiz_id=q.id) quizCount FROM courses c LEFT JOIN quizzes q ON q.id=c.quiz_id AND q.org_id=c.org_id WHERE c.org_id=?${scope}${courseId?' AND c.id=?':''} ORDER BY c.title,c.id`,[org,...(learner||teacher?[uid,uid]:[]),...(courseId?[courseId]:[])],db);

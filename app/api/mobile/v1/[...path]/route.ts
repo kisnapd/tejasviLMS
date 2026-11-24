@@ -7,6 +7,7 @@ import {loginSource} from '@/lib/login-source';
 import {hashPassword,verifyPassword} from '@/lib/password';
 import {createMobileSession,mobileUser,mobileUserDto,refreshMobileSession,revokeMobileSession} from '@/lib/mobile-sessions';
 import {roles} from '@/lib/platform-types';
+import {registeredSql,today,expiredMessage} from '@/lib/registration.mjs';
 import * as platform from '@/app/api/platform/route';
 import * as units from '@/app/api/units/route';
 import * as assessments from '@/app/api/assessments/route';
@@ -24,7 +25,7 @@ async function json(request:Request,limit=4096){
  if(!request.headers.get('content-type')?.includes('application/json'))throw new AppError('Expected JSON.');
  try{return JSON.parse(new TextDecoder().decode(await boundedBody(request,limit)))}catch(e){if(e instanceof AppError)throw e;throw new AppError('Invalid JSON.');}
 }
-async function memberships(uid:string){return rows("SELECT o.id,o.name,o.kind,m.role FROM organizations o JOIN memberships m ON m.org_id=o.id WHERE m.user_id=? AND m.role IN ('admin','teacher','student','employee') ORDER BY o.name,o.id",[uid]);}
+async function memberships(uid:string){return rows(`SELECT o.id,o.name,o.kind,m.role FROM organizations o JOIN memberships m ON m.org_id=o.id JOIN users u ON u.id=m.user_id WHERE m.user_id=? AND m.role IN ('admin','teacher','student','employee') AND (u.platform_admin=1 OR ${registeredSql('o')}) ORDER BY o.name,o.id`,[uid,today()]);}
 // Only an authenticated mobile request reaches this adapter. Reuse the web
 // business rules without weakening browser origin/CSRF checks or trusting roles.
 async function forward(request:Request,path:string,body?:unknown){
@@ -78,7 +79,7 @@ export async function POST(request:Request,ctx:Context){try{
   const account=await one('SELECT * FROM users WHERE email=?',[email]);
   const valid=await verifyPassword(data.password,account?.password_hash||'scrypt:00000000000000000000000000000000:'+'0'.repeat(128));
   if(!account||!valid)throw new AppError('Email or password is incorrect.',401);
-  if(!(await memberships(account.id)).length&&!account.platform_admin)throw new AppError('Your account has no active learning workspace. Contact your administrator.',403);
+  if(!(await memberships(account.id)).length&&!account.platform_admin){if(await one("SELECT 1 ok FROM memberships m JOIN organizations o ON o.id=m.org_id WHERE m.user_id=? AND m.role IN ('admin','teacher','student','employee') AND o.kind IN ('school','college') LIMIT 1",[account.id]))throw new AppError(expiredMessage,403);throw new AppError('Your account has no active learning workspace. Contact your administrator.',403);}
   const session=await transaction(async db=>{
    const current=await one('SELECT password_hash FROM users WHERE id=? FOR UPDATE',[account.id],db);
    if(current?.password_hash!==account.password_hash)throw new AppError('Your password changed. Please sign in again.',401);

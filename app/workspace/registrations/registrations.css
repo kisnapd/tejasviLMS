@@ -1,0 +1,24 @@
+.rg-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:.7rem;margin:1.6rem 0 .6rem}
+.rg-summary>div{background:white;border:1px solid #d2dce0;border-radius:12px;padding:.85rem 1rem}
+.rg-summary dt{font-size:.78rem;color:#536c7c}.rg-summary dd{margin:.2rem 0 0;font-size:1.7rem;font-weight:750;font-variant-numeric:tabular-nums}
+.rg-summary .rg-alert{border-color:#efc2c2;background:#fdf3f3}.rg-summary .rg-alert dd{color:#9b2121}
+.tr-inbox article.rg-card>div:first-child{flex:1}
+.rg-card.rg-expired,.rg-card.rg-missing{border-color:#efc2c2}.rg-card.rg-expiring{border-color:#f0d39a}
+.rg-status{display:inline-block;font-size:.8rem;font-weight:700;border-radius:999px;padding:.15rem .6rem;margin:.2rem 0 .6rem!important}
+.rg-status-active{background:#e6f4ec;color:#1d5a36}.rg-status-expiring{background:#fff3d6;color:#6a4500}.rg-status-expired,.rg-status-missing{background:#fde4e4;color:#8a1f1f}
+.rg-key{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:.4rem 1rem;margin:.4rem 0}
+.rg-key dt{font-size:.74rem;color:#536c7c}.rg-key dd{margin:.1rem 0 0;overflow-wrap:anywhere}
+.tr-inbox code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:#eef3f6;border-radius:5px;padding:.08rem .35rem;letter-spacing:.02em}
+.rg-issued{background:#e6f4ec;border:1px solid #c5dfcf;color:#1d4a33;border-radius:9px;padding:.6rem .75rem}
+.rg-history{margin-top:.6rem;font-size:.86rem;color:#435d6f}.rg-history summary{cursor:pointer}.rg-history ul{margin:.4rem 0;padding-left:1.1rem;line-height:1.6}
+.rg-form{display:grid;gap:.35rem;margin-top:.9rem;padding-top:.9rem;border-top:1px solid #e1e8eb;max-width:420px}
+.rg-form label{display:grid;gap:.25rem;font-size:.86rem;font-weight:650}
+.rg-form input{font:inherit;font-weight:400;border:1px solid #abc0ca;border-radius:7px;padding:.5rem .6rem;color:#193951;background:white}
+.rg-form small{color:#536c7c;font-size:.78rem;line-height:1.4}
+.rg-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.4rem}.rg-side{flex:none;margin:0}
+.tr-inbox button{cursor:pointer;text-transform:none}
+.tr-inbox button.rg-secondary{background:white;color:#193951}
+.tr-inbox button.rg-danger{background:white;color:#9b2121;border-color:#e3aaaa}
+.rg-error{color:#9b2121;font-weight:600}
+@media (max-width:640px){.tr-inbox article.rg-card{flex-direction:column}}
+.tr-inbox code,.hub-registration b{white-space:nowrap}

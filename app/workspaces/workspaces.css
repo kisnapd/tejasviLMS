@@ -3,3 +3,10 @@
 .hub-account{display:flex;align-items:center;gap:.7rem}.hub-account button{cursor:pointer;border:1px solid #b8ccde;border-radius:8px;background:white;color:#183f64;padding:.4rem .6rem;font:inherit}
 
 .hub-owner-tools{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem}.campus-hub .hub-leads{display:inline-flex;padding:.58rem .8rem;background:white;border:1px solid #a7becd;color:#173e5a;text-decoration:none;border-radius:8px;font-weight:650;font-size:.88rem}
+
+.campus-hub .hub-leads{align-items:center;gap:.4rem}
+.hub-registration{display:flex;gap:.55rem;align-items:flex-start;margin:0 0 1rem;padding:.65rem .75rem;border-radius:10px;background:#eef6f1;border:1px solid #c5dfcf;color:#1d4a33;font-size:.86rem;line-height:1.45}.hub-registration>svg{flex:none;margin-top:.15rem}.hub-registration b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;margin-right:.35rem}
+.hub-registration-soon{background:#fff7e6;border-color:#f0d39a;color:#6a4500}
+.hub-registration-expired{background:#fdeeee;border-color:#efc2c2;color:#7a1d1d}.hub-registration-expired b{font-family:inherit;letter-spacing:0}.hub-registration-expired a{color:inherit;font-weight:700;text-decoration:underline}
+.hub-card-locked{border-color:#efc2c2}
+.hub-registration b{white-space:nowrap}

@@ -8,11 +8,13 @@ import {learningCategoryError} from '@/lib/learning-category';
 import { learnerClause,teacherClause,coursePermission } from '@/lib/course-access';
 import { brandColumns, selectBrand } from '@/lib/branding';
 import { z } from 'zod';
+import { requiresRegistration, expiryProblem, issueRegistration } from '@/lib/registration.mjs';
+import { normalizeAcademicYear, adYearOfBs, currentBsYear } from '@/modules/emis/shared/bs.mjs';
 import { randomUUID } from 'node:crypto';
 import { roles } from '@/lib/platform-types';
 import { rows, one, run, transaction, type DB } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
-import { AppError, identity, membership, canEdit, requireAdmin, checkRole, respond, failure, readJson, jsonValue } from '@/lib/platform-server';
+import { AppError, identity, membership, assertRegistered, canEdit, requireAdmin, checkRole, respond, failure, readJson, jsonValue } from '@/lib/platform-server';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const str=(max=200)=>z.string().trim().min(1).max(max),id=z.string().uuid();
 const lessonSchema=z.object({id,format:z.enum(['text','video','audio','live']).default('text'),duration:z.number().int().min(0).max(600).default(0),title:str(),content:z.string().trim().max(20000),videoUrl:z.string().trim().max(2000).refine(v=>!v||referenceUrl(v))});
@@ -25,7 +27,7 @@ export async function GET(request:Request){try{
  const organizations=await rows(`SELECT o.id,o.name,o.kind,o.address,o.contact_email AS contactEmail,o.phone,o.registration_number AS registrationNumber,m.role,${brandColumns} FROM organizations o JOIN memberships m ON o.id=m.org_id WHERE m.user_id=? AND o.kind=? AND (m.role=? OR m.role=?) ORDER BY o.created_at`,[user.userId,expected.kind,expected.role,'admin']);
  const selected=url.searchParams.get('org'),organization=selected?organizations.find(o=>o.id===selected):organizations[0]||null;if(selected&&!organization)throw new AppError('This workspace is not available to your account.',403);
  if(!organization)return respond({user,workspaces,organizations,organization:null,courses:[],quizzes:[],plans:[],members:[],progress:[]});
- const orgId=organization.id,admin=organization.role==='admin';
+ const orgId=organization.id,admin=organization.role==='admin';await assertRegistered(orgId,user.userId);
  const courses=await rows(`SELECT c.*,u.email FROM courses c JOIN users u ON u.id=c.author_id WHERE c.org_id=?${learner?` AND c.status='published' AND ${learnerClause()}`:admin?'':` AND ${teacherClause()}`} ORDER BY c.updated_at DESC`,admin&&!learner?[orgId]:[orgId,user.userId,user.userId]);
  const courseIds=courses.map(c=>c.id),marks=courseIds.map(()=>'?').join(',');
  const lessons=courseIds.length?await rows(`SELECT * FROM lessons WHERE course_id IN (${marks}) ORDER BY position`,courseIds):[];
@@ -48,8 +50,10 @@ export async function POST(request:Request){try{
  const user=await identity(),body=await readJson(request),action=str(40).parse(body.action);
  if(action==='organization'){
   if(!user.platformAdmin)throw new AppError('Only the platform administrator can create organizations.',403);
-  const data=z.object({name:str(120),kind:z.enum(['school','college','corporate','edtech']),address:z.string().trim().max(500).default(''),contactEmail:z.union([z.string().email().max(254),z.literal('')]).default(''),phone:z.string().trim().max(40).default(''),registrationNumber:z.string().trim().max(100).default('')}).parse(body),orgId=randomUUID();
-  await transaction(async c=>{await run('INSERT INTO organizations(id,name,kind,address,contact_email,phone,registration_number,created_by) VALUES(?,?,?,?,?,?,?,?)',[orgId,data.name,data.kind,data.address,data.contactEmail,data.phone,data.registrationNumber,user.userId],c);await run('INSERT INTO memberships(org_id,user_id,role) VALUES(?,?,?)',[orgId,user.userId,'admin'],c);await createCampus(c,orgId,data.kind,body.academicYear||null);await syncMember(c,orgId,user.userId)});await selectBrand(orgId);return respond({id:orgId,redirect:loginDestination({kind:data.kind,role:'admin'},user.platformAdmin)},201);
+  const data=z.object({name:str(120),kind:z.enum(['school','college','corporate','edtech']),address:z.string().trim().max(500).default(''),contactEmail:z.union([z.string().email().max(254),z.literal('')]).default(''),phone:z.string().trim().max(40).default(''),registrationNumber:z.string().trim().max(100).default(''),registrationExpiresOn:z.string().trim().max(10).default('')}).parse(body),orgId=randomUUID();
+  const licensed=requiresRegistration(data.kind),keyYear=licensed?(normalizeAcademicYear(body.academicYear||'')||adYearOfBs(currentBsYear())):'';
+  if(licensed){const problem=expiryProblem(data.registrationExpiresOn);if(problem)throw new AppError('Registration key: '+problem);}
+  await transaction(async c=>{await run('INSERT INTO organizations(id,name,kind,address,contact_email,phone,registration_number,created_by) VALUES(?,?,?,?,?,?,?,?)',[orgId,data.name,data.kind,data.address,data.contactEmail,data.phone,data.registrationNumber,user.userId],c);await run('INSERT INTO memberships(org_id,user_id,role) VALUES(?,?,?)',[orgId,user.userId,'admin'],c);await createCampus(c,orgId,data.kind,body.academicYear||null);await syncMember(c,orgId,user.userId);if(licensed)await issueRegistration((sql:string,values:any[])=>run(sql,values,c),{id:randomUUID(),orgId,academicYear:keyYear,expiresOn:data.registrationExpiresOn,userId:user.userId})});await selectBrand(orgId);return respond({id:orgId,redirect:loginDestination({kind:data.kind,role:'admin'},user.platformAdmin)},201);
  }
  const orgId=id.parse(body.orgId),member=await membership(orgId,user.userId);
  if(action==='select-organization'){const redirect=loginDestination(member,user.platformAdmin);if(!redirect)throw new AppError('This membership has no active workspace.',403);await selectBrand(orgId);return respond({ok:true,redirect})}

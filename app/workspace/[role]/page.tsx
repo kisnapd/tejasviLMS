@@ -5,6 +5,8 @@ import { memberBrand } from '@/lib/branding';
 import {loginDestination} from '@/lib/login-destination';
 import { notFound,redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
+import { one } from '@/lib/db';
+import { registeredSql, requiresRegistration, today } from '@/lib/registration.mjs';
 import { roles, type RoleKey } from '@/lib/platform-types';
 import {EdtechWorkspace} from '@/components/edtech/workspace';
 import { Workspace } from '@/components/platform/workspace';
@@ -18,6 +20,7 @@ async function Protected({role}:{role:RoleKey}){
    if(actual)redirect(actual);
    redirect(user.platformAdmin?'/workspace/start':'/login');
  }
+ if(!user.platformAdmin&&requiresRegistration(brand.kind)&&!await one(`SELECT 1 ok FROM organizations o WHERE o.id=? AND ${registeredSql('o')}`,[brand.id,today()]))redirect('/workspaces');
  return roles[role].kind==='edtech'?<EdtechWorkspace role={role} initialBrand={brand as any}/>:<Workspace role={role} initialBrand={brand as any}/>;
 }
 export default async function WorkspacePage({params}:{params:Promise<{role:string}>}){const {role}=await params;if(!Object.hasOwn(roles,role))notFound();return <Protected role={role as RoleKey}/>}

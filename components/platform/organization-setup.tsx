@@ -3,9 +3,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowLeftRight, ArrowRight, Blocks, BriefcaseBusiness, CalendarDays, Check, ChevronDown,
-  CircleAlert, FileText, GraduationCap, Mail, MapPin, Phone, School, Sparkles, type LucideIcon,
+  CircleAlert, FileText, GraduationCap, KeyRound, Mail, MapPin, Phone, School, Sparkles, type LucideIcon,
 } from 'lucide-react';
-import { academicYearLabel, adYearOfBs, bsYearOf, currentBsYear, normalizeAcademicYear } from '@/modules/emis/shared/bs.mjs';
+import { academicYearLabel, adYearOfBs, bsMonthDays, bsToAd, bsYearOf, currentBsYear, formatBs, normalizeAcademicYear } from '@/modules/emis/shared/bs.mjs';
+
+/** Last day of Chaitra for a stored academic year such as '2026/27', as an AD date. */
+function yearEnd(stored: string) { try { const bs = bsYearOf(stored); return bsToAd(bs, 12, bsMonthDays(bs, 12)); } catch { return ''; } }
 
 const options = [
   { value: 'school', name: 'School', field: 'School', example: 'Sunrise Secondary School', icon: School, image: 'school', eyebrow: 'FOR CURIOUS MINDS', headline: 'Small discoveries. Big possibilities.', description: 'Learning and EMIS for classes, students and school operations.', tags: 'Grades · Sections · Subjects', intro: 'Set the name students and staff will see, and the academic year for your school records.' },
@@ -25,9 +28,16 @@ function Field({ id, label, icon: Icon, hint, children }: {
   </div>;
 }
 
-function AcademicYearField({ id }: { id: string }) {
+function AcademicYearField({ id, expiryId }: { id: string; expiryId: string }) {
   const [value, setValue] = useState(() => String(currentBsYear()));
   const stored = normalizeAcademicYear(value);
+  return <>
+    <AcademicYearInput id={id} value={value} setValue={setValue} stored={stored}/>
+    <RegistrationExpiryField id={expiryId} academicYear={stored}/>
+  </>;
+}
+
+function AcademicYearInput({ id, value, setValue, stored }: { id: string; value: string; setValue: (v: string) => void; stored: string }) {
   const hint = stored
     ? `${academicYearLabel(stored)} · Baishakh ${bsYearOf(stored)} to Chaitra ${bsYearOf(stored)}`
     : 'Enter the year in Bikram Sambat, for example ' + currentBsYear() + ', or in AD as ' + adYearOfBs(currentBsYear()) + '.';
@@ -35,6 +45,19 @@ function AcademicYearField({ id }: { id: string }) {
     <input id={id} name="academicYear" required maxLength={12} inputMode="numeric" value={value}
       aria-describedby={id+'-hint'} spellCheck={false} autoComplete="off" placeholder={'e.g. '+currentBsYear()}
       onChange={e=>{const v=e.currentTarget.value;setValue(v);e.currentTarget.setCustomValidity(normalizeAcademicYear(v)?'':'Enter the year in Bikram Sambat, for example '+currentBsYear()+', or in AD as '+adYearOfBs(currentBsYear())+'.');}}/>
+  </Field>;
+}
+
+/** The registration key is issued with the organization and stops working after this date. */
+function RegistrationExpiryField({ id, academicYear }: { id: string; academicYear: string }) {
+  const suggested = academicYear ? yearEnd(academicYear) : '';
+  const [edited, setEdited] = useState(''), value = edited || suggested;
+  const bs = value ? formatBs(value) : '';
+  const hint = 'A registration key is created for this workspace. Everyone at the institution is locked out after this date until you renew it.' + (bs ? ' Last valid day: ' + bs + ' BS.' : '');
+  return <Field id={id} label="Registration key valid until" icon={KeyRound} hint={hint}>
+    <input id={id} name="registrationExpiresOn" type="date" required value={value} aria-describedby={id+'-hint'}
+      min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}
+      onChange={e=>setEdited(e.currentTarget.value)}/>
   </Field>;
 }
 
@@ -61,7 +84,7 @@ function Details({ selected, busy, active, onChangeType, error, titleRef, prefix
       <Field id={id('name')} label={selected.field+' name'} icon={Icon}>
         <input id={id('name')} name="name" autoComplete="organization" required pattern={'.*\\S.*'} maxLength={120} placeholder={'e.g. '+selected.example}/>
       </Field>
-      {isAcademic && <AcademicYearField id={id('year')}/>}
+      {isAcademic && <AcademicYearField id={id('year')} expiryId={id('registration-expiry')}/>}
       <details className="org-details-more" ref={optional} onInvalidCapture={()=>{if(optional.current) optional.current.open=true;}}>
         <summary><span>Contact &amp; registration</span><span className="org-details-optional">Optional</span><ChevronDown size={18} aria-hidden="true"/></summary>
         <div className="org-details-extra">

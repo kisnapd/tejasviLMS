@@ -24,7 +24,8 @@
     "qa:server": "node tests/qa/server.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report storage/qa/report"
+    "test:e2e:report": "playwright show-report storage/qa/report",
+    "test:registration": "node --test tests/registration.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
