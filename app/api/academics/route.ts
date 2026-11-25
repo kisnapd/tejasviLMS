@@ -2,11 +2,16 @@ import {curriculumKind,curriculumSubject,linkCurriculumSubject} from '@/lib/curr
 import {matchingSemester} from '@/lib/college-policy';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { rows,one,run,transaction } from '@/lib/db';
+import { rows,one,run,transaction,type DB } from '@/lib/db';
 import { identity,membership,requireAdmin,readJson,respond,failure,AppError } from '@/lib/platform-server';
 import { coursePermission,teacherClause } from '@/lib/course-access';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const uuid=z.string().uuid(),text=(n=120)=>z.string().trim().min(1).max(n),date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v),optionalDate=z.union([date,z.literal('')]).default('');
+/** Learners in a class study all of its subjects, and existing subject content reaches the class. Individual subjects can still be removed. */
+async function fillClass(batch:string,db?:DB){
+ await run('INSERT IGNORE INTO student_subjects(batch_id,subject_id,user_id) SELECT bs.batch_id,bs.subject_id,bm.user_id FROM batch_subjects bs JOIN batch_members bm ON bm.batch_id=bs.batch_id WHERE bs.batch_id=?',[batch],db);
+ await run('INSERT IGNORE INTO course_batches(course_id,batch_id) SELECT co.id,bs.batch_id FROM courses co JOIN batch_subjects bs ON bs.subject_id=co.subject_id WHERE bs.batch_id=?',[batch],db);
+}
 async function entity(table:'grades'|'sections'|'subjects'|'batches'|'courses'|'faculties'|'programs',id:string,org:string){const r=await one(`SELECT * FROM ${table} WHERE id=? AND org_id=?`,[uuid.parse(id),org]);if(!r)throw new AppError('Select an item in this organization.',403);return r}
 export async function GET(request:Request){try{const user=await identity(),org=uuid.parse(new URL(request.url).searchParams.get('org')),m=await membership(org,user.userId),admin=m.role==='admin',teacher=m.role==='teacher';
  const batches=await rows(`SELECT b.*,g.name AS grade_name,s.name AS section_name,p.name AS program_name,f.name AS faculty_name FROM batches b LEFT JOIN grades g ON g.id=b.grade_id LEFT JOIN sections s ON s.id=b.section_id LEFT JOIN programs p ON p.id=g.program_id LEFT JOIN faculties f ON f.id=p.faculty_id WHERE b.org_id=?${admin?'':teacher?' AND EXISTS(SELECT 1 FROM teacher_assignments ta WHERE ta.batch_id=b.id AND ta.user_id=?)':' AND EXISTS(SELECT 1 FROM batch_members bm WHERE bm.batch_id=b.id AND bm.user_id=?)'} ORDER BY b.name`,admin?[org]:[org,user.userId]);const ids=batches.map(b=>b.id),marks=ids.map(()=>'?').join(',');
@@ -27,7 +32,7 @@ export async function POST(request:Request){try{const user=await identity(),body
   if(action==='program'){await entity('faculties',body.facultyId,org);await run('INSERT INTO programs(id,org_id,faculty_id,name) VALUES(?,?,?,?)',[id,org,body.facultyId,name])}
   if(action==='grade'){const program=m.kind==='college'?await entity('programs',body.programId,org):null;await run('INSERT INTO grades(id,org_id,program_id,name) VALUES(?,?,?,?)',[id,org,program?.id||null,name])}
   if(action==='subject'&&m.kind==='college')throw new AppError('Add college subjects from College workspace, under the correct faculty and semester.');
-  if(action==='subject')await run('INSERT INTO subjects(id,org_id,name,code) VALUES(?,?,?,?)',[id,org,name,z.string().max(40).parse(body.code||'')]);
+  if(action==='subject'){const grade=await entity('grades',body.gradeId,org);await run('INSERT INTO subjects(id,org_id,name,code,college_semester_id) VALUES(?,?,?,?,?)',[id,org,name,z.string().max(40).parse(body.code||''),grade.id])}
   if(action==='section'){await entity('grades',body.gradeId,org);await run('INSERT INTO sections(id,org_id,grade_id,name) VALUES(?,?,?,?)',[id,org,body.gradeId,name])}
   if(action==='batch'||action==='batch-update'){
    if(action==='batch-update')await entity('batches',id,org);
@@ -35,7 +40,7 @@ export async function POST(request:Request){try{const user=await identity(),body
    if(section&&section.grade_id!==grade?.id)throw new AppError('The section must belong to the selected grade or semester.');
    if(m.kind==='college'){const program=await entity('programs',body.programId,org),faculty=await entity('faculties',body.facultyId,org);if(program.faculty_id!==faculty.id||grade?.program_id!==program.id)throw new AppError('Choose a matching faculty, program and semester.');}
    const subjectIds=academic?z.array(uuid).min(1).max(30).parse(body.subjectIds):[];
-   for(const sid of new Set(subjectIds)){const subject=await entity('subjects',sid,org);if(!matchingSemester(subject.college_semester_id,grade?.id))throw new AppError('Subject belongs to a different faculty or semester.');}
+   for(const sid of new Set(subjectIds)){const subject=await entity('subjects',sid,org);if(!matchingSemester(subject.college_semester_id,grade?.id))throw new AppError(m.kind==='college'?'Subject belongs to a different faculty or semester.':'This subject belongs to another grade.');}
    if(action==='batch-update'&&m.kind==='college'){const prior=await entity('batches',id,org);if(prior.grade_id!==grade?.id)throw new AppError('Create a new semester intake instead of moving an existing class and its records.');}
    const year=academic?text(40).parse(body.academicYear):'',start=optionalDate.parse(body.startDate),end=optionalDate.parse(body.endDate);
    if(start&&end&&end<start)throw new AppError('End date must follow start date.');
@@ -43,6 +48,7 @@ export async function POST(request:Request){try{const user=await identity(),body
     if(action==='batch-update')await run('UPDATE batches SET name=?,grade_id=?,section_id=?,academic_year=?,start_date=?,end_date=? WHERE id=? AND org_id=?',[name,grade?.id||null,section?.id||null,year,start||null,end||null,id,org],db);
     else await run('INSERT INTO batches(id,org_id,name,grade_id,section_id,academic_year,start_date,end_date) VALUES(?,?,?,?,?,?,?,?)',[id,org,name,grade?.id||null,section?.id||null,year,start||null,end||null],db);
     for(const sid of new Set(subjectIds))await run('INSERT IGNORE INTO batch_subjects(batch_id,subject_id) VALUES(?,?)',[id,sid],db);
+    if(academic)await fillClass(id,db);
    });
   }
   return respond({id},201);
@@ -52,9 +58,9 @@ export async function POST(request:Request){try{const user=await identity(),body
  if(action==='course-student'){const c=await entity('courses',body.courseId,org),target=uuid.parse(body.userId),member=await membership(org,target);if(!['student','employee'].includes(member.role))throw new AppError('Choose a learner.');if(body.remove===true)await run('DELETE FROM course_students WHERE course_id=? AND user_id=?',[c.id,target]);else await run('INSERT IGNORE INTO course_students(course_id,user_id) VALUES(?,?)',[c.id,target]);return respond({ok:true})}
  const batch=await entity('batches',body.batchId,org);
  if(action==='course-batch'){const c=await entity('courses',body.courseId,org);if(c.subject_id){const subject=await entity('subjects',c.subject_id,org);if(!matchingSemester(subject.college_semester_id,batch.grade_id))throw new AppError('This content belongs to another semester.');}if(body.remove===true)await run('DELETE FROM course_batches WHERE course_id=? AND batch_id=?',[c.id,batch.id]);else await run('INSERT IGNORE INTO course_batches(course_id,batch_id) VALUES(?,?)',[c.id,batch.id]);return respond({ok:true})}
- if(action==='batch-member'){const target=uuid.parse(body.userId),member=await membership(org,target);if(!['student','employee'].includes(member.role))throw new AppError('Choose a learner.');if(body.remove===true)await run('DELETE FROM batch_members WHERE batch_id=? AND user_id=?',[batch.id,target]);else await run('INSERT IGNORE INTO batch_members(batch_id,user_id) VALUES(?,?)',[batch.id,target]);return respond({ok:true})}
- const subject=await entity('subjects',body.subjectId,org);if(!matchingSemester(subject.college_semester_id,batch.grade_id))throw new AppError('Subject belongs to a different faculty or semester.');
- if(action==='batch-subject'){await run('INSERT IGNORE INTO batch_subjects(batch_id,subject_id) VALUES(?,?)',[batch.id,subject.id]);return respond({ok:true})}
+ if(action==='batch-member'){const target=uuid.parse(body.userId),member=await membership(org,target);if(!['student','employee'].includes(member.role))throw new AppError('Choose a learner.');if(body.remove===true)await run('DELETE FROM batch_members WHERE batch_id=? AND user_id=?',[batch.id,target]);else{await run('INSERT IGNORE INTO batch_members(batch_id,user_id) VALUES(?,?)',[batch.id,target]);if(m.kind!=='corporate')await fillClass(batch.id)}return respond({ok:true})}
+ const subject=await entity('subjects',body.subjectId,org);if(!matchingSemester(subject.college_semester_id,batch.grade_id))throw new AppError(m.kind==='college'?'Subject belongs to a different faculty or semester.':'This subject belongs to another grade.');
+ if(action==='batch-subject'){await run('INSERT IGNORE INTO batch_subjects(batch_id,subject_id) VALUES(?,?)',[batch.id,subject.id]);await fillClass(batch.id);return respond({ok:true})}
  if(!await one('SELECT 1 FROM batch_subjects WHERE batch_id=? AND subject_id=?',[batch.id,subject.id]))throw new AppError('Add this subject to the batch first.');const target=uuid.parse(body.userId),member=await membership(org,target);
  if(action==='teacher'){if(member.role!=='teacher')throw new AppError('Choose a teacher account.');if(body.remove===true)await run('DELETE FROM teacher_assignments WHERE batch_id=? AND subject_id=? AND user_id=?',[batch.id,subject.id,target]);else await run('INSERT IGNORE INTO teacher_assignments(batch_id,subject_id,user_id) VALUES(?,?,?)',[batch.id,subject.id,target]);return respond({ok:true})}
  if(action==='student-subject'){if(!await one('SELECT 1 FROM batch_members WHERE batch_id=? AND user_id=?',[batch.id,target]))throw new AppError('Add this learner to the batch first.');if(body.remove===true)await run('DELETE FROM student_subjects WHERE batch_id=? AND subject_id=? AND user_id=?',[batch.id,subject.id,target]);else await run('INSERT IGNORE INTO student_subjects(batch_id,subject_id,user_id) VALUES(?,?,?)',[batch.id,subject.id,target]);return respond({ok:true})}

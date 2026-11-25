@@ -10,10 +10,10 @@ const byNumber=(a:string,b:string)=>a.localeCompare(b,undefined,{numeric:true});
 
 /**
  * Subjects for a school or college. Staff see every subject they can teach, grouped by grade
- * (or program semester), with its content. Subjects come from EMIS, so there is nothing to create here.
+ * (or program semester), with its content. Subjects come from EMIS, or from Classes & enrolments for Learning-only institutions.
  * Learners see the subject content assigned to them. Non-credit courses keep a simple list.
  */
-export function InstitutionLearning({orgId,courses,academic,college,learner,teacher,onCreate,onOpen}:{orgId:string;courses:Course[];academic:boolean;college:boolean;learner:boolean;teacher:boolean;onCreate:(subject?:SubjectPreset)=>void;onOpen:(c:Course)=>void}){
+export function InstitutionLearning({orgId,courses,academic,college,learner,teacher,emis,onCreate,onOpen,onSetup}:{orgId:string;courses:Course[];academic:boolean;college:boolean;learner:boolean;teacher:boolean;emis:boolean;onCreate:(subject?:SubjectPreset)=>void;onOpen:(c:Course)=>void;onSetup?:()=>void}){
  const [search,setSearch]=useState(''),[structure,setStructure]=useState<Structure|null>(null),[error,setError]=useState('');
  const staffSubjects=academic&&!learner;
  useEffect(()=>{if(!staffSubjects)return;let live=true;fetch('/api/academics?org='+orgId).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);if(live)setStructure(d)}).catch(e=>{if(live)setError((e as Error).message)});return()=>{live=false}},[orgId,staffSubjects]);
@@ -38,7 +38,7 @@ export function InstitutionLearning({orgId,courses,academic,college,learner,teac
 
  if(staffSubjects)return <>{header}{error&&<p className="error-box" role="alert">{error}</p>}{searchBox}
   {!structure&&!error&&<p role="status">Loading subjects…</p>}
-  {structure&&!groups.length&&<section className="editor-section"><h2>{search?'No matching subjects':'No subjects yet'}</h2><p>{search?'Try another subject, code or grade.':teacher?'Subjects appear here once you are named as their teacher in EMIS.':`Add ${college?'courses to each program semester':'subjects to each class'} in EMIS. They appear here automatically.`}</p></section>}
+  {structure&&!groups.length&&<section className="editor-section"><h2>{search?'No matching subjects':'No subjects yet'}</h2><p>{search?'Try another subject, code or grade.':teacher?`Subjects appear here once you are assigned to teach them${emis?' in EMIS':''}.`:emis?`Add ${college?'courses to each program semester':'subjects to each class'} in EMIS. They appear here automatically.`:'Create grades, subjects and classes in Classes & enrolments, then add students to each class.'}</p>{!emis&&onSetup&&!search&&<button className="button button-orange" onClick={onSetup}>Open Classes & enrolments</button>}</section>}
   {groups.map(g=><section key={g.label} className="subject-group" aria-labelledby={'grade-'+g.label}><h2 id={'grade-'+g.label}>{g.label}</h2><div className="subject-list">{g.list.map(s=>{
    const content=courses.filter(c=>c.subjectId===s.id),sections=new Set(structure!.batchSubjects.filter(b=>b.subject_id===s.id).map(b=>b.batch_id)).size,teachers=[...new Set(structure!.teachers.filter(t=>t.subject_id===s.id).map(t=>t.name))];
    return <article key={s.id} className="subject-row"><div className="subject-row-head"><div><h3>{s.name}{s.code&&<small> · {s.code}</small>}</h3><p className="muted"><Users size={14}/> {sections} {college?'group':'section'}{sections===1?'':'s'}{teachers.length?' · '+teachers.join(', '):' · Teacher has no login yet'}</p></div><button className="button button-outline" onClick={()=>onCreate({id:s.id,name:s.name,grade:g.label})}><Plus size={15}/> Add content</button></div>

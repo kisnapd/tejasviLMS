@@ -48,6 +48,18 @@ function AcademicYearInput({ id, value, setValue, stored }: { id: string; value:
   </Field>;
 }
 
+/** Learning with EMIS, or Learning on its own. It can be changed later on Registration keys. */
+function PlanField({ id }: { id: string }) {
+  const plans = [['learning_emis', 'Learning + EMIS', 'Classes, students, attendance, exams and fees in EMIS, synced to Learning.'], ['learning', 'Learning only', 'Courses, subjects and classes managed in Learning. No EMIS.']];
+  return <fieldset className="org-details-field org-plan" aria-describedby={id + '-hint'}>
+    <legend>Plan</legend>
+    <div className="org-plan-options">{plans.map(([value, title, text], i) => <label key={value} className="org-plan-option">
+      <input type="radio" name="plan" value={value} defaultChecked={i === 0} required/><span><b>{title}</b><small>{text}</small></span>
+    </label>)}</div>
+    <small id={id + '-hint'}>You can change this later on Registration keys.</small>
+  </fieldset>;
+}
+
 /** The registration key is issued with the organization and stops working after this date. */
 function RegistrationExpiryField({ id, academicYear }: { id: string; academicYear: string }) {
   const suggested = academicYear ? yearEnd(academicYear) : '';
@@ -84,6 +96,7 @@ function Details({ selected, busy, active, onChangeType, error, titleRef, prefix
       <Field id={id('name')} label={selected.field+' name'} icon={Icon}>
         <input id={id('name')} name="name" autoComplete="organization" required pattern={'.*\\S.*'} maxLength={120} placeholder={'e.g. '+selected.example}/>
       </Field>
+      {isAcademic && <PlanField id={id('plan')}/>}
       {isAcademic && <AcademicYearField id={id('year')} expiryId={id('registration-expiry')}/>}
       <details className="org-details-more" ref={optional} onInvalidCapture={()=>{if(optional.current) optional.current.open=true;}}>
         <summary><span>Contact &amp; registration</span><span className="org-details-optional">Optional</span><ChevronDown size={18} aria-hidden="true"/></summary>

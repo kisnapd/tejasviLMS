@@ -18,9 +18,10 @@ export function RegistrationCard({row}:{row:RegistrationRow}){
  const stored=normalizeAcademicYear(year),expires=date||(stored?yearEnd(stored):'');
  async function send(body:object){setBusy(true);setError('');try{const r=await fetch('/api/registrations',{method:'POST',headers,body:JSON.stringify({orgId:row.id,...body})}),b=await r.json();if(!r.ok)throw Error(b.error||'The key could not be saved.');return b;}catch(e){setError((e as Error).message);return null;}finally{setBusy(false);}}
  async function renew(e:React.FormEvent){e.preventDefault();const b=await send({action:'renew',academicYear:year,expiresOn:expires});if(b){setIssued(b.key);setOpen(false);router.refresh();}}
+ async function plan(){const emis=!row.emis;if(!confirm(emis?`Add EMIS for ${row.name}? Staff will see EMIS alongside Learning. Classes and students already in Learning are not copied into EMIS.`:`Switch ${row.name} to Learning only? EMIS is hidden and its records are kept. Classes and people are then managed in Learning.`))return;if(await send({action:'plan',emis}))router.refresh();}
  async function revoke(){if(!confirm('Revoke the key for '+row.name+'? Everyone at this institution is locked out immediately, until you issue a new key.'))return;if(await send({action:'revoke'}))router.refresh();}
  return <article id={'org-'+row.id} className={'rg-card rg-'+row.status}><div>
-  <p className="tr-meta">{row.kind}{row.campusYear?' · EMIS year '+bsLabel(row.campusYear):''}</p>
+  <p className="tr-meta">{row.kind} · {row.emis?'Learning + EMIS':'Learning only'}{row.campusYear&&row.emis?' · EMIS year '+bsLabel(row.campusYear):''}</p>
   <h2>{row.name}</h2>
   <p className={'rg-status rg-status-'+row.status}>{labels[row.status]}{row.daysLeft!==null&&row.daysLeft>=0&&row.daysLeft<=30?` · ${row.daysLeft===0?'last day today':row.daysLeft+' day'+(row.daysLeft===1?'':'s')+' left'}`:''}</p>
   {row.key?<dl className="rg-key"><div><dt>Key</dt><dd><code>{row.key}</code></dd></div><div><dt>Academic year</dt><dd>{bsLabel(row.academicYear)} ({row.academicYear})</dd></div><div><dt>Valid until</dt><dd>{when(row.expiresOn)}</dd></div></dl>:<p>This institution has no current key.</p>}
@@ -36,6 +37,6 @@ export function RegistrationCard({row}:{row:RegistrationRow}){
   </form>}
   {error&&<p role="alert" className="rg-error">{error}</p>}
  </div>
- {!open&&<div className="rg-actions rg-side"><button type="button" disabled={busy} onClick={()=>{setOpen(true);setIssued('');}}>{row.key?'Renew':'Issue key'}</button>{row.key&&<button type="button" className="rg-danger" disabled={busy} onClick={revoke}>Revoke</button>}</div>}
+ {!open&&<div className="rg-actions rg-side"><button type="button" disabled={busy} onClick={()=>{setOpen(true);setIssued('');}}>{row.key?'Renew':'Issue key'}</button><button type="button" className="rg-secondary" disabled={busy} onClick={plan}>{row.emis?'Switch to Learning only':'Add EMIS'}</button>{row.key&&<button type="button" className="rg-danger" disabled={busy} onClick={revoke}>Revoke</button>}</div>}
  </article>;
 }

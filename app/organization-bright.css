@@ -96,3 +96,9 @@
 .org-details-error svg{margin-top:.15rem}
 @media(max-width:420px){.org-details-extra{padding-inline:.4rem}.org-details-more summary{gap:.25rem .45rem;padding-inline:.45rem}.org-details-control>svg{inset-inline-start:.8rem}.org-details .org-details-control :is(input,textarea){padding-inline-start:2.5rem}}
 @media(forced-colors:active){.org-details-mark,.org-details .org-details-submit{border:1px solid ButtonText}}
+.org-plan{border:0;padding:0;margin:0}.org-plan legend{font-weight:700;font-size:.92rem;margin-bottom:.5rem;padding:0}
+.org-plan-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:.6rem}
+.org-plan-option{display:flex;gap:.6rem;align-items:flex-start;padding:.75rem .85rem;border:1px solid #c9d6e4;border-radius:12px;background:#fff;cursor:pointer}
+.org-plan-option:has(input:checked){border-color:#123e72;box-shadow:0 0 0 1px #123e72;background:#f3f7fc}
+.org-plan-option input{margin-top:.2rem;accent-color:#123e72}.org-plan-option b,.org-plan-option small{display:block}.org-plan-option small{color:#5b6f85;font-size:.8rem;line-height:1.4;margin-top:.15rem}
+.org-plan>small{color:#5b6f85;font-size:.8rem}

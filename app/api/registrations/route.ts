@@ -5,6 +5,7 @@ import {one,run,transaction} from '@/lib/db';
 import {expiryProblem,issueRegistration,requiresRegistration} from '@/lib/registration.mjs';
 import {normalizeAcademicYear} from '@/modules/emis/shared/bs.mjs';
 import {registrationList} from '@/lib/registration-list';
+import {syncLearning} from '@/lib/learning-sync.mjs';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 
 async function superAdmin(){const user=await identity();if(!user.platformAdmin)throw new AppError('Only the Tejasvi Super Admin can manage registration keys.',403);return user}
@@ -12,9 +13,15 @@ async function superAdmin(){const user=await identity();if(!user.platformAdmin)t
 export async function GET(){try{await superAdmin();return respond({organizations:await registrationList()})}catch(e){return failure(e)}}
 
 export async function POST(request:Request){try{
- const user=await superAdmin(),body=await readJson(request,4096),base=z.object({action:z.enum(['renew','revoke']),orgId:z.string().uuid()}).parse(body);
+ const user=await superAdmin(),body=await readJson(request,4096),base=z.object({action:z.enum(['renew','revoke','plan']),orgId:z.string().uuid()}).parse(body);
  const org=await one('SELECT id,kind FROM organizations WHERE id=?',[base.orgId]);if(!org)throw new AppError('Organization not found.',404);
  if(!requiresRegistration(org.kind))throw new AppError('Only schools and colleges use registration keys.');
+ if(base.action==='plan'){
+  // Turning EMIS on brings Learning in step with whatever EMIS already holds. Turning it off keeps every record.
+  const emis=z.object({emis:z.boolean()}).parse(body).emis;
+  await transaction(async c=>{await run('UPDATE organizations SET emis=? WHERE id=?',[emis,org.id],c);if(emis)await syncLearning(c,org.id);});
+  return respond({ok:true});
+ }
  if(base.action==='revoke'){
   const r=await run('UPDATE organization_registrations SET revoked_at=UTC_TIMESTAMP(3),revoked_by=? WHERE org_id=? AND revoked_at IS NULL',[user.userId,org.id]);
   if(!r.affectedRows)throw new AppError('This organization has no current key to revoke.');return respond({ok:true});

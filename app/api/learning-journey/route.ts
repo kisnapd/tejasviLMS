@@ -16,7 +16,8 @@ export async function GET(request:Request){try{
 export async function POST(request:Request){try{
  const user=await identity(),b=await readJson(request),base=z.object({org:id,courseId:id,action:z.enum(['approve','export','policy','school-internal'])}).parse(b);
  const answer=await transaction(async c=>{
-  await one('SELECT id FROM organizations WHERE id=? FOR UPDATE',[base.org],c);
+  const org=await one('SELECT id,emis FROM organizations WHERE id=? FOR UPDATE',[base.org],c);
+  if(base.action==='export'&&!Number(org?.emis))throw new AppError('This institution uses Learning only, so results stay in the Learning gradebook.');
   await one('SELECT id FROM courses WHERE id=? AND org_id=? FOR UPDATE',[base.courseId,base.org],c);
   const report=await learningJourney(base.org,user.userId,c,base.courseId);
   if(!['admin','teacher'].includes(report.role))throw new AppError('Teaching access is required.',403);
